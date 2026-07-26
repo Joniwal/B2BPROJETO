@@ -17,7 +17,7 @@ const state = {
 // a cor do badge é calculada automaticamente (veja statusColor mais abaixo),
 // não precisa mexer em CSS.
 const STATUS_OPTIONS = [
-  "NOVO",
+  "Novo",
   "CONCLUIDO",
   "PENDENTE AGENDAMENTO",
   "PCC",
@@ -459,7 +459,7 @@ function renderKpis(kpis) {
       value: kpis.concluidos_total ?? 0,
       icon: "bi-check-circle",
       color: "kpi-green",
-      statusFilter: "Concluído",
+      statusFilter: "CONCLUIDO",
     },
   ];
 
@@ -478,8 +478,8 @@ function renderKpis(kpis) {
   row.querySelectorAll(".kpi-card").forEach((el) => {
     el.addEventListener("click", () => {
       const statusFilter = el.dataset.statusFilter || "";
-      document.getElementById("fStatus").value = statusFilter;
-      document.getElementById("quickStatusFilter").value = statusFilter;
+      setSelectValueWithFallback("fStatus", statusFilter);
+      setSelectValueWithFallback("quickStatusFilter", statusFilter);
       collectFilters();
       state.page = 1;
       loadItems();
