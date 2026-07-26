@@ -17,7 +17,7 @@ const state = {
 // a cor do badge é calculada automaticamente (veja statusColor mais abaixo),
 // não precisa mexer em CSS.
 const STATUS_OPTIONS = [
-  "NOVO",
+  "Novo",
   "CONCLUIDO",
   "PENDENTE AGENDAMENTO",
   "PCC",
