@@ -212,6 +212,7 @@ body {
 #itemsTable tbody td {
   font-size: 8pt;
   border-bottom: 0.5px solid var(--border-input);
+  white-space: nowrap;
 }
 .sort-icon { font-size: 7.5pt; opacity: .5; }
 
@@ -220,7 +221,9 @@ body {
   font-size: 11pt;
   margin-right: 10px;
   color: #888;
+  display: inline-block;
 }
+.action-icon:last-child { margin-right: 0; }
 .action-icon:hover { color: var(--accent); }
 .action-icon.text-danger:hover { color: #a52a1f; }
 

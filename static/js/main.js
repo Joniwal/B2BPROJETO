@@ -159,6 +159,26 @@ function bindEvents() {
     }, 400);
   });
 
+  // Filtro "ao vivo": aplica automaticamente enquanto o usuário digita/escolhe,
+  // sem precisar clicar em "Aplicar filtros" (o botão continua funcionando,
+  // caso prefira usar).
+  let liveFilterDebounce;
+  const applyLiveFilter = () => {
+    clearTimeout(liveFilterDebounce);
+    liveFilterDebounce = setTimeout(() => {
+      collectFilters();
+      state.page = 1;
+      loadItems();
+      loadDashboard();
+    }, 400);
+  };
+  ["fCliente", "fId", "fCidade", "fExecutadoPor"].forEach((id) => {
+    document.getElementById(id).addEventListener("input", applyLiveFilter);
+  });
+  ["fStatus", "fDataInicio", "fDataFim"].forEach((id) => {
+    document.getElementById(id).addEventListener("change", applyLiveFilter);
+  });
+
   document.getElementById("pageSizeSelect").addEventListener("change", (e) => {
     state.pageSize = parseInt(e.target.value, 10);
     state.page = 1;
@@ -496,7 +516,7 @@ function destroyChart(key) {
 }
 
 function renderCharts(data) {
-  renderBarChart("chartCliente", data.por_cliente, "#3d95c4");
+  renderPccChart("chartPcc", data.por_pcc);
   renderBarChart("chartCidade", data.por_cidade, "#59a869");
   renderBarChart("chartExecutadoPor", data.por_executadopor, "#f0913e");
   renderLineChart("chartDataConclusao", data.por_data_conclusao);
@@ -519,6 +539,40 @@ function renderBarChart(canvasId, dataset, color) {
       },
       responsive: true,
       maintainAspectRatio: false,
+    },
+  });
+}
+
+function renderPccChart(canvasId, dataset) {
+  destroyChart(canvasId);
+  const ctx = document.getElementById(canvasId).getContext("2d");
+  state.charts[canvasId] = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: dataset.labels,
+      datasets: [{ data: dataset.data, backgroundColor: "#6c5ce7", borderRadius: 3 }],
+    },
+    options: {
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (item) => item.label } },
+      },
+      scales: {
+        y: { display: false, beginAtZero: true },
+        x: { ticks: { font: { size: 8 }, maxRotation: 60, minRotation: 45 } },
+      },
+      responsive: true,
+      maintainAspectRatio: false,
+      onClick: () => {
+        // Clicar em qualquer barra filtra a tabela por TODOS os clientes em PCC,
+        // não só o cliente daquela barra específica.
+        setSelectValueWithFallback("fStatus", "PCC");
+        setSelectValueWithFallback("quickStatusFilter", "PCC");
+        collectFilters();
+        state.page = 1;
+        loadItems();
+        loadDashboard();
+      },
     },
   });
 }

@@ -14,12 +14,19 @@ Expõe a classe `DataClient` com uma interface de CRUD:
 import os
 import logging
 import re
+import tempfile
+import threading
 import unicodedata
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 
 logger = logging.getLogger("redeb2b.excel_client")
+
+# Trava para evitar leituras/escritas simultâneas no mesmo arquivo Excel
+# quando o Flask atende mais de uma requisição ao mesmo tempo.
+EXCEL_LOCK = threading.RLock()
 
 # Colunas oficiais da planilha REDEB2B, na ordem definida no escopo.
 FIELDS = [
@@ -85,12 +92,126 @@ def _parse_date(value):
     return s[:10]
 
 
+def _obter_pastas_onedrive() -> list[Path]:
+    """Lista as pastas locais do OneDrive candidatas (pessoal e/ou
+    corporativo), a partir das variáveis de ambiente que o próprio OneDrive
+    define e, como reforço, procurando por pastas 'OneDrive*' na home do
+    usuário."""
+    candidatos: list[Path] = []
+
+    for variavel in ("OneDriveCommercial", "OneDriveConsumer", "OneDrive"):
+        valor = os.environ.get(variavel)
+        if valor:
+            caminho = Path(valor).expanduser()
+            if caminho.exists():
+                candidatos.append(caminho)
+
+    for pasta in Path.home().glob("OneDrive*"):
+        if pasta.is_dir():
+            candidatos.append(pasta)
+
+    resultado: list[Path] = []
+    vistos: set[str] = set()
+    for pasta in candidatos:
+        try:
+            chave = str(pasta.resolve()).casefold()
+        except OSError:
+            chave = str(pasta).casefold()
+        if chave not in vistos:
+            vistos.add(chave)
+            resultado.append(pasta)
+    return resultado
+
+
+def _localizar_excel_no_onedrive(nome_arquivo: str):
+    """Procura nome_arquivo dentro das pastas do OneDrive: primeiro em
+    alguns locais comuns (raiz, Documentos), depois com busca recursiva
+    completa como último recurso. Retorna (caminho_encontrado_ou_None,
+    lista_de_pastas_verificadas)."""
+    pastas_onedrive = _obter_pastas_onedrive()
+    if not pastas_onedrive:
+        return None, []
+
+    caminhos_relativos = [
+        Path(nome_arquivo),
+        Path("Documentos") / nome_arquivo,
+        Path("Documents") / nome_arquivo,
+    ]
+
+    for pasta in pastas_onedrive:
+        for relativo in caminhos_relativos:
+            caminho = pasta / relativo
+            if caminho.is_file() and not caminho.name.startswith("~$"):
+                return caminho, pastas_onedrive
+
+    encontrados: list[Path] = []
+    for pasta in pastas_onedrive:
+        try:
+            encontrados.extend(
+                caminho
+                for caminho in pasta.rglob(nome_arquivo)
+                if caminho.is_file() and not caminho.name.startswith("~$")
+            )
+        except (PermissionError, OSError):
+            continue
+
+    if encontrados:
+        encontrados.sort(key=lambda caminho: (len(caminho.parts), str(caminho).casefold()))
+        return encontrados[0], pastas_onedrive
+
+    return None, pastas_onedrive
+
+
 class DataClient:
     """Cliente de dados baseado exclusivamente em um arquivo Excel local."""
 
+    # Cache de classe: guarda o caminho já localizado automaticamente, para
+    # não precisar varrer o OneDrive inteiro a cada requisição.
+    _caminho_cache: str | None = None
+
     def __init__(self):
-        self.excel_path = os.getenv("EXCEL_PATH", "")
-        self.excel_sheet = os.getenv("EXCEL_SHEET_NAME", "TbRelatorio")
+        # Se EXCEL_PATH estiver preenchido no .env, ele tem prioridade e é
+        # usado exatamente como configurado (comportamento manual, como antes).
+        self.excel_path_env = os.getenv("EXCEL_PATH", "").strip()
+        # Se EXCEL_PATH estiver vazio, o app procura automaticamente por este
+        # nome de arquivo dentro das pastas do OneDrive sincronizadas nesta
+        # máquina (pessoal e/ou corporativo).
+        self.excel_filename = os.getenv("EXCEL_FILENAME", "REDE_B2B.xlsx").strip()
+        self.excel_sheet = os.getenv("EXCEL_SHEET_NAME", "REDEB2B").strip()
+
+    def _resolver_caminho_excel(self) -> str:
+        """Decide qual arquivo usar: 1) EXCEL_PATH explícito no .env, se
+        existir; 2) um caminho já localizado automaticamente antes; 3) uma
+        nova busca automática pelas pastas do OneDrive."""
+        if self.excel_path_env:
+            caminho = Path(self.excel_path_env).expanduser()
+            if caminho.is_file():
+                return str(caminho)
+            raise DataClientError(
+                f"O caminho configurado em EXCEL_PATH não foi encontrado: '{caminho}'. "
+                "Verifique se o caminho está correto, ou apague o valor de EXCEL_PATH "
+                "no .env para que o sistema tente localizar o arquivo automaticamente "
+                "no OneDrive.",
+                status_code=500,
+            )
+
+        if DataClient._caminho_cache and Path(DataClient._caminho_cache).is_file():
+            return DataClient._caminho_cache
+
+        encontrado, pastas_verificadas = _localizar_excel_no_onedrive(self.excel_filename)
+        if encontrado:
+            DataClient._caminho_cache = str(encontrado)
+            return DataClient._caminho_cache
+
+        pastas_texto = "\n".join(f"- {p}" for p in pastas_verificadas) or "(nenhuma pasta do OneDrive foi encontrada nesta máquina)"
+        raise DataClientError(
+            f"O arquivo '{self.excel_filename}' não foi encontrado automaticamente no "
+            f"OneDrive.\n\nPastas verificadas:\n{pastas_texto}\n\n"
+            "Confirme se o OneDrive está instalado, logado e sincronizado, e se o "
+            "arquivo está marcado como 'Sempre manter neste dispositivo'. Como "
+            "alternativa, defina o caminho manualmente em EXCEL_PATH no .env.",
+            status_code=500,
+        )
 
     # ------------------------------------------------------------------
     # Métodos públicos
@@ -129,6 +250,29 @@ class DataClient:
         rows = self._apply_filters(rows, filters)
         rows = self._apply_sort(rows, sort)
         return rows
+
+    def status_arquivo(self):
+        """Diagnóstico: informa se o Excel foi localizado, onde, e quais
+        abas ele tem (comparando com a aba configurada) — sem lançar
+        exceção, útil para conferir rapidamente configuração/sincronização."""
+        try:
+            caminho = self._resolver_caminho_excel()
+        except DataClientError as exc:
+            return {"disponivel": False, "caminho": "", "mensagem": exc.message}
+
+        abas = self._listar_abas(caminho)
+        abas_lista = [a.strip() for a in abas.split(",")] if "," in abas or abas else [abas]
+        aba_configurada_existe = self.excel_sheet in abas_lista
+
+        return {
+            "disponivel": True,
+            "caminho": caminho,
+            "aba_configurada": self.excel_sheet,
+            "abas_no_arquivo": abas,
+            "aba_configurada_existe": aba_configurada_existe,
+            "mensagem": "Excel localizado." if aba_configurada_existe
+                else f"Arquivo localizado, mas a aba '{self.excel_sheet}' não existe nele.",
+        }
 
     def get_item(self, item_id):
         rows = self._excel_read_all()
@@ -222,9 +366,19 @@ class DataClient:
             1 for r in rows if _strip_accents(r.get("STATUS")) == _strip_accents("Novo")
         )
 
+        # Últimos 6 clientes com STATUS = PCC, na ordem em que aparecem no
+        # arquivo (que corresponde à ordem cronológica de inclusão, já que
+        # novos registros são sempre adicionados ao final da planilha).
+        pcc_rows = [r for r in rows if _strip_accents(r.get("STATUS")) == _strip_accents("PCC")]
+        ultimos_pcc = pcc_rows[-6:]
+        por_pcc = {
+            "labels": [r.get("CLIENTE") or "Não informado" for r in ultimos_pcc],
+            "data": [1 for _ in ultimos_pcc],
+        }
+
         return {
             "kpis": kpis,
-            "por_cliente": group_count("CLIENTE"),
+            "por_pcc": por_pcc,
             "por_cidade": group_count("CIDADE"),
             "por_executadopor": group_count("EXECUTADOPOR"),
             "por_status": status_counts,
@@ -349,18 +503,45 @@ class DataClient:
     # ------------------------------------------------------------------
     # Leitura / escrita do Excel
     # ------------------------------------------------------------------
-    def _excel_read_all(self):
-        if not self.excel_path or not os.path.exists(self.excel_path):
-            raise DataClientError(
-                f"Arquivo Excel não encontrado em '{self.excel_path}'. "
-                "Verifique a variável EXCEL_PATH no .env.",
-                status_code=500,
-            )
+    @staticmethod
+    def _listar_abas(caminho):
+        """Lista os nomes reais das abas de um arquivo Excel — usado para
+        compor mensagens de erro mais úteis quando a aba configurada não
+        existe."""
         try:
-            df = pd.read_excel(self.excel_path, sheet_name=self.excel_sheet, dtype=str)
-        except Exception as exc:  # noqa: BLE001 - queremos capturar qualquer erro de leitura
-            logger.exception("Erro lendo Excel")
-            raise DataClientError(f"Erro ao ler o arquivo Excel: {exc}", status_code=500)
+            from openpyxl import load_workbook
+            workbook = load_workbook(caminho, read_only=True)
+            try:
+                return ", ".join(workbook.sheetnames) or "(nenhuma aba encontrada)"
+            finally:
+                workbook.close()
+        except Exception:  # noqa: BLE001
+            return "(não foi possível listar as abas)"
+
+    def _excel_read_all(self):
+        caminho = self._resolver_caminho_excel()
+        with EXCEL_LOCK:
+            try:
+                df = pd.read_excel(caminho, sheet_name=self.excel_sheet, dtype=str)
+            except PermissionError as exc:
+                raise DataClientError(
+                    "Não foi possível ler o Excel — feche o arquivo no Excel/OneDrive "
+                    "e tente novamente.",
+                    status_code=500,
+                ) from exc
+            except ValueError as exc:
+                # Provavelmente a aba (sheet_name) configurada não existe neste
+                # arquivo — lista as abas reais para facilitar a correção.
+                abas_disponiveis = self._listar_abas(caminho)
+                raise DataClientError(
+                    f"A aba '{self.excel_sheet}' não foi encontrada no arquivo. "
+                    f"Abas disponíveis: {abas_disponiveis}. Ajuste EXCEL_SHEET_NAME "
+                    "no .env para o nome exato de uma dessas abas.",
+                    status_code=500,
+                ) from exc
+            except Exception as exc:  # noqa: BLE001 - queremos capturar qualquer erro de leitura
+                logger.exception("Erro lendo Excel")
+                raise DataClientError(f"Erro ao ler o arquivo Excel: {exc}", status_code=500) from exc
 
         for field in FIELDS:
             if field not in df.columns:
@@ -381,9 +562,39 @@ class DataClient:
         return rows
 
     def _excel_write_all(self, rows):
+        caminho = self._resolver_caminho_excel()
+        caminho_path = Path(caminho)
         df = pd.DataFrame(rows, columns=FIELDS)
-        try:
-            df.to_excel(self.excel_path, sheet_name=self.excel_sheet, index=False)
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Erro escrevendo Excel")
-            raise DataClientError(f"Erro ao gravar o arquivo Excel: {exc}", status_code=500)
+        arquivo_temporario = None
+
+        with EXCEL_LOCK:
+            try:
+                # Escreve primeiro num arquivo temporário na mesma pasta e só
+                # substitui o arquivo real no final (os.replace é atômico).
+                # Isso evita deixar o Excel corrompido/pela metade caso algo
+                # falhe no meio da escrita (ex.: sincronização do OneDrive).
+                with tempfile.NamedTemporaryFile(
+                    prefix="redeb2b_tmp_", suffix=".xlsx",
+                    dir=str(caminho_path.parent), delete=False,
+                ) as tmp:
+                    arquivo_temporario = tmp.name
+
+                with pd.ExcelWriter(arquivo_temporario, engine="openpyxl") as writer:
+                    df.to_excel(writer, sheet_name=self.excel_sheet, index=False)
+
+                os.replace(arquivo_temporario, caminho)
+            except PermissionError as exc:
+                raise DataClientError(
+                    "Não foi possível salvar o Excel — feche o arquivo no Excel, "
+                    "confirme a sincronização do OneDrive e tente novamente.",
+                    status_code=500,
+                ) from exc
+            except Exception as exc:  # noqa: BLE001
+                logger.exception("Erro escrevendo Excel")
+                raise DataClientError(f"Erro ao gravar o arquivo Excel: {exc}", status_code=500) from exc
+            finally:
+                if arquivo_temporario and os.path.exists(arquivo_temporario):
+                    try:
+                        os.remove(arquivo_temporario)
+                    except OSError:
+                        pass

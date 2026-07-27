@@ -12,7 +12,7 @@ import logging
 from flask import Flask, render_template, jsonify
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 logging.basicConfig(
     level=logging.INFO,

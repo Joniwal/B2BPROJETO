@@ -28,10 +28,18 @@ redeb2b_app/
 
 **`excel_client.py`** expõe a classe `DataClient`, com os métodos
 `list_items`, `get_item`, `create_item`, `update_item`, `delete_item`,
-`dashboard_aggregates` e `items_by_date` — todos operando sobre o arquivo
-apontado por `EXCEL_PATH`, na aba `EXCEL_SHEET_NAME`. A cada escrita
-(criar/atualizar/excluir), o arquivo inteiro é relido e regravado, então
-evite editar o Excel manualmente enquanto a aplicação estiver com o
+`dashboard_aggregates` e `items_by_date`. O arquivo Excel usado é decidido
+assim:
+1. Se `EXCEL_PATH` estiver preenchido no `.env`, esse caminho é usado
+   diretamente (modo manual).
+2. Se `EXCEL_PATH` estiver em branco, o sistema procura automaticamente um
+   arquivo chamado `EXCEL_FILENAME` (padrão: `REDE_B2B.xlsx`) dentro das
+   pastas do OneDrive sincronizadas nesta máquina (pessoal e/ou
+   corporativo), inclusive dentro de subpastas.
+
+A cada escrita (criar/atualizar/excluir), o arquivo inteiro é relido e
+regravado (de forma atômica, num arquivo temporário substituído no final),
+então evite editar o Excel manualmente enquanto a aplicação estiver com o
 navegador aberto e em uso simultâneo.
 
 **Endpoints da API** (`api.py`, todas as respostas em JSON):
@@ -46,6 +54,7 @@ navegador aberto e em uso simultâneo.
 | GET | `/api/dashboard` | Agregações para KPIs e gráficos (Chart.js) |
 | GET | `/api/items-by-date?data=YYYY-MM-DD` | Registros agendados em uma data (usado ao clicar no gráfico de linha) |
 | GET | `/api/export` | Baixa em `.xlsx` os registros que atendem aos mesmos filtros/ordenação de `/api/items`, sem paginação (todos os que passam pelo filtro) |
+| GET | `/api/excel-status` | Diagnóstico: mostra se o Excel foi localizado e em qual caminho (útil para depurar problemas de OneDrive) |
 
 ---
 
@@ -74,13 +83,32 @@ python -m pip install -r requirements.txt
 cp .env.example .env             # Linux/Mac
 copy .env.example .env           # Windows
 
-# 5. Edite o .env com o caminho correto do seu arquivo Excel
+# 5. Edite o .env se necessário (veja abaixo)
 ```
 
-No `.env`:
+No `.env`, você tem duas opções:
+
+**Opção 1 — automática (recomendada):** deixe `EXCEL_PATH` em branco. O
+sistema vai procurar sozinho o arquivo `REDE_B2B.xlsx` (ou o nome que você
+colocar em `EXCEL_FILENAME`) dentro das pastas do OneDrive sincronizadas
+nesta máquina — não precisa saber o caminho completo.
 ```
-EXCEL_PATH=C:\Users\PEGGY\Desktop\PROJETO\REDE_B2B.xlsx
-EXCEL_SHEET_NAME=TbRelatorio
+EXCEL_PATH=
+EXCEL_FILENAME=REDE_B2B.xlsx
+EXCEL_SHEET_NAME=REDEB2B
+```
+
+**Opção 2 — manual:** preencha `EXCEL_PATH` com o caminho completo. Quando
+preenchido, ele tem prioridade sobre a busca automática.
+```
+EXCEL_PATH=C:\Users\PEGGY\OneDrive - Telefonica\PROJETO\REDE_B2B.xlsx
+EXCEL_SHEET_NAME=REDEB2B
+```
+
+Para conferir se o arquivo foi encontrado (e onde), acesse no navegador,
+com a aplicação rodando:
+```
+http://localhost:5000/api/excel-status
 ```
 
 Se você ainda não tem o arquivo, gere um de exemplo com dados fictícios:

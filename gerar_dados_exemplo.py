@@ -22,7 +22,7 @@ from datetime import date, timedelta
 import pandas as pd
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 FIELDS = [
     "IDCLIENTE", "CLIENTE", "ENDERECO", "CIDADE", "PRODUTO", "ATIVIDADE",
@@ -75,7 +75,7 @@ def main():
     else:
         path = os.getenv("EXCEL_PATH", "./REDE_B2B_exemplo.xlsx")
 
-    sheet_name = os.getenv("EXCEL_SHEET_NAME", "TbRelatorio")
+    sheet_name = os.getenv("EXCEL_SHEET_NAME", "REDEB2B")
     rows = [gerar_linha(i) for i in range(1, 41)]
     df = pd.DataFrame(rows, columns=FIELDS)
 

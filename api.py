@@ -140,6 +140,15 @@ def get_items_by_date():
         return jsonify({"ok": False, "error": "Erro interno ao buscar registros da data."}), 500
 
 
+@api_bp.route("/excel-status", methods=["GET"])
+def excel_status():
+    """Diagnóstico rápido: mostra se o Excel foi localizado e em qual
+    caminho — útil para conferir problemas de sincronização do OneDrive
+    sem precisar mexer no código."""
+    status = data_client.status_arquivo()
+    return jsonify({"ok": True, "data": status})
+
+
 @api_bp.route("/export", methods=["GET"])
 def export_items():
     """Gera e envia um arquivo .xlsx com exatamente os registros que
