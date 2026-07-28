@@ -16,7 +16,7 @@
 
 body {
   font-family: "Segoe UI", Calibri, Lato, Arial, sans-serif;
-  font-size: 8pt;
+  font-size: 7pt;
   background-color: var(--bg-page);
   color: #333;
 }
@@ -202,7 +202,7 @@ body {
 #itemsTable thead th {
   color: var(--accent);
   font-weight: 600;
-  font-size: 8pt;
+  font-size: 7pt;
   border-bottom: 0.5px solid var(--border-input);
   cursor: pointer;
   user-select: none;
@@ -210,7 +210,7 @@ body {
 }
 #itemsTable thead th:hover { color: var(--accent-dark); }
 #itemsTable tbody td {
-  font-size: 8pt;
+  font-size: 7pt;
   border-bottom: 0.5px solid var(--border-input);
   white-space: nowrap;
 }
@@ -219,7 +219,7 @@ body {
 .action-icon {
   cursor: pointer;
   font-size: 11pt;
-  margin-right: 10px;
+  margin-right: 9px;
   color: #888;
   display: inline-block;
 }
@@ -230,10 +230,10 @@ body {
 /* Badges de STATUS */
 .status-badge {
   display: inline-block;
-  min-width: 130px;
+  min-width: 120px;
   padding: 3px 8px;
   border-radius: 10px;
-  font-size: 7.5pt;
+  font-size: 7pt;
   font-weight: 600;
   color: #fff;
   text-align: center;
