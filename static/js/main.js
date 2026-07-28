@@ -70,6 +70,7 @@ const FORM_FIELDS = [
 document.addEventListener("DOMContentLoaded", () => {
   populateStatusSelects();
   populateFixedFormSelects();
+  populateFilterSelects();
   bindEvents();
   loadDashboard();
   loadItems();
@@ -102,6 +103,11 @@ function populateFixedFormSelects() {
   populateSelect("f_ATIVIDADE", ATIVIDADE_OPTIONS, "Selecione a atividade...");
   populateSelect("f_TECNOLOGIA", TECNOLOGIA_OPTIONS, "Selecione a tecnologia...");
   populateSelect("f_EXECUTADOPOR", EXECUTADOPOR_OPTIONS, "Selecione o executor...");
+}
+
+function populateFilterSelects() {
+  populateSelect("fCidade", CIDADE_OPTIONS, "Todas as cidades");
+  populateSelect("fExecutadoPor", EXECUTADOPOR_OPTIONS, "Todos");
 }
 
 /** Define o valor de um combobox com fallback: se o valor não existir entre
@@ -180,10 +186,10 @@ function bindEvents() {
       loadDashboard();
     }, 400);
   };
-  ["fCliente", "fId", "fCidade", "fExecutadoPor"].forEach((id) => {
+  ["fCliente", "fId"].forEach((id) => {
     document.getElementById(id).addEventListener("input", applyLiveFilter);
   });
-  ["fStatus", "fDataInicio", "fDataFim"].forEach((id) => {
+  ["fCidade", "fExecutadoPor", "fStatus", "fDataInicio", "fDataFim"].forEach((id) => {
     document.getElementById(id).addEventListener("change", applyLiveFilter);
   });
 
@@ -524,7 +530,7 @@ function destroyChart(key) {
 }
 
 function renderCharts(data) {
-  renderPccChart("chartPcc", data.por_pcc);
+  renderConcluidos4MesesChart("chartConcluidos4Meses", data.concluidos_4_meses);
   renderBarChart("chartCidade", data.por_cidade, "#59a869");
   renderBarChart("chartExecutadoPor", data.por_executadopor, "#f0913e");
   renderLineChart("chartDataConclusao", data.por_data_conclusao);
@@ -551,36 +557,50 @@ function renderBarChart(canvasId, dataset, color) {
   });
 }
 
-function renderPccChart(canvasId, dataset) {
+/** Plugin específico do gráfico "Concluídos — últimos 4 meses": em vez de um
+ * único número, mostra a metragem de ERB, GPON e o total dos dois, acima de
+ * cada barra (a altura da barra continua sendo a contagem de concluídos). */
+function criarPluginRotuloConcluidos4Meses(dataset) {
+  return {
+    id: "concluidos4MesesDataLabels",
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      const meta = chart.getDatasetMeta(0);
+      meta.data.forEach((bar, index) => {
+        const erb = dataset.metragem_erb?.[index] ?? 0;
+        const gpon = dataset.metragem_gpon?.[index] ?? 0;
+        const total = dataset.metragem_total?.[index] ?? (erb + gpon);
+        ctx.save();
+        ctx.fillStyle = "#444";
+        ctx.font = "6.5px 'Segoe UI', Calibri, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(`ERB:${erb}m GPON:${gpon}m Total:${total}m`, bar.x, bar.y - 3);
+        ctx.restore();
+      });
+    },
+  };
+}
+
+function renderConcluidos4MesesChart(canvasId, dataset) {
   destroyChart(canvasId);
   const ctx = document.getElementById(canvasId).getContext("2d");
   state.charts[canvasId] = new Chart(ctx, {
     type: "bar",
     data: {
       labels: dataset.labels,
-      datasets: [{ data: dataset.data, backgroundColor: "#6c5ce7", borderRadius: 3 }],
+      datasets: [{ data: dataset.data, backgroundColor: "#59a869", borderRadius: 3 }],
     },
+    plugins: [criarPluginRotuloConcluidos4Meses(dataset)],
     options: {
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: (item) => item.label } },
-      },
+      plugins: { legend: { display: false } },
       scales: {
-        y: { display: false, beginAtZero: true },
-        x: { ticks: { font: { size: 8 }, maxRotation: 60, minRotation: 45 } },
+        y: { beginAtZero: true, ticks: { precision: 0, font: { size: 8 } } },
+        x: { ticks: { font: { size: 8 } } },
       },
       responsive: true,
       maintainAspectRatio: false,
-      onClick: () => {
-        // Clicar em qualquer barra filtra a tabela por TODOS os clientes em PCC,
-        // não só o cliente daquela barra específica.
-        setSelectValueWithFallback("fStatus", "PCC");
-        setSelectValueWithFallback("quickStatusFilter", "PCC");
-        collectFilters();
-        state.page = 1;
-        loadItems();
-        loadDashboard();
-      },
+      layout: { padding: { top: 14 } },
     },
   });
 }

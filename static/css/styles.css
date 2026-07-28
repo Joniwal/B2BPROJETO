@@ -56,8 +56,8 @@ body {
 }
 
 .filters-panel {
-  width: 260px;
-  min-width: 260px;
+  width: 230px;
+  min-width: 230px;
   background: #ffffff;
   border-right: 1px solid var(--border-input);
   min-height: calc(100vh - 56px);
@@ -74,6 +74,12 @@ body {
   font-size: 7.5pt;
   color: #777;
   margin-bottom: 2px;
+}
+/* Bootstrap define font-size explícito em .btn-sm (mais específico que a
+   regra "body"), por isso o tamanho de fonte do body sozinho não bastava
+   para diminuir os botões do painel de filtros — precisa deste override. */
+.filters-panel .btn {
+  font-size: 7pt;
 }
 
 .content {
@@ -207,19 +213,21 @@ body {
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
+  padding: 5px 6px;
 }
 #itemsTable thead th:hover { color: var(--accent-dark); }
 #itemsTable tbody td {
   font-size: 7pt;
   border-bottom: 0.5px solid var(--border-input);
   white-space: nowrap;
+  padding: 4px 6px;
 }
 .sort-icon { font-size: 7.5pt; opacity: .5; }
 
 .action-icon {
   cursor: pointer;
-  font-size: 11pt;
-  margin-right: 9px;
+  font-size: 10.5pt;
+  margin-right: 6px;
   color: #888;
   display: inline-block;
 }
@@ -230,10 +238,10 @@ body {
 /* Badges de STATUS */
 .status-badge {
   display: inline-block;
-  min-width: 120px;
-  padding: 3px 8px;
+  min-width: 95px;
+  padding: 2px 6px;
   border-radius: 10px;
-  font-size: 7pt;
+  font-size: 6.5pt;
   font-weight: 600;
   color: #fff;
   text-align: center;
