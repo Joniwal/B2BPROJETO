@@ -16,22 +16,15 @@ const state = {
 // Para acrescentar um novo status no futuro, basta adicionar o nome aqui —
 // a cor do badge é calculada automaticamente (veja statusColor mais abaixo),
 // não precisa mexer em CSS.
-const STATUS_OPTIONS = [
-  "Novo",
-  "CONCLUIDO",
-  "PENDENTE AGENDAMENTO",
-  "PCC",
-  "SEM ACAO OSP",
-  "CANCELADO",
-  "VISTORIA",
-  "INICIADO NAO FINALIZADO",
-  "EM EXECUÇÃO",
-];
+const STATUS_OPTIONS = ["AGENDADO","CABO NA PORTA","CANCELADO","CONCLUIDO","EM CAMPO",
+"INICIADO NAO CONCLUIDO","NOVO","PCC","PENDENTE AGENDAMENTO","SEM ACAO OSP","SEM VT",
+"VERSIONAMENTO","VISTORIA AGENDADA","VISTORIA CONCLUIDA"];
 
 // Nomes disponíveis no combobox "Quem está registrando?". A data e hora são
 // adicionadas automaticamente ao valor salvo no campo USUARIO — não edite
 // isso manualmente, só a lista de nomes abaixo.
-const USUARIO_OPTIONS = ["Cintia", "Maria Cristina", "Isabella", "Joni Wilson", "Marcos Neves", "Ana Vitória"];
+const USUARIO_OPTIONS = ["CINTIA", "MARIA CRISTINA", "ISABELLA", "JONI WILSON", "MARCOS NEVES", 
+  "ANA VITORIA"];
 
 // --------------------------------------------------------------------------
 // Estas 4 listas ficam vazias por padrão — adicione os valores que você
@@ -43,10 +36,25 @@ const USUARIO_OPTIONS = ["Cintia", "Maria Cristina", "Isabella", "Joni Wilson", 
 // incluí-lo aqui.
 // Exemplo: const CIDADE_OPTIONS = ["Campinas", "Sorocaba", "São Paulo"];
 // --------------------------------------------------------------------------
-const CIDADE_OPTIONS = [];
-const ATIVIDADE_OPTIONS = [];
-const TECNOLOGIA_OPTIONS = [];
-const EXECUTADOPOR_OPTIONS = [];
+const CIDADE_OPTIONS = ["ADRIANÓPOLIS","AGUDOS DO SUL","ALMIRANTE TAMANDARÉ","ALTAMIRA DO PARANÁ",
+"ANTONINA","ANTÔNIO OLINTO","ARAUCÁRIA","BALSA NOVA","BITURUNA","BOA VENTURA DE SÃO ROQUE","BOCAIÚVA DO SUL",
+"CAMPINA DO SIMÃO","CAMPINA GRANDE DO SUL","CAMPO DO TENENTE","CAMPO LARGO","CAMPO MAGRO","CANDÓI",
+"CARAMBEÍ","CERRO AZUL","COLOMBO","CASTRO","CONTENDA","CRUZ MACHADO","CURITIBA","DOUTOR ULYSSES",
+"FAZENDA RIO GRANDE","FERNANDES PINHEIRO","FOZ DO JORDÃO","GENERAL CARNEIRO","GOIOXIM",
+"GUAMIRANGA","GUARAPUAVA","GUARAQUEÇABA","GUARATUBA","IMBAÚ","IMBITUVA","INÁCIO MARTINS",
+"IPIRANGA","IRATI","ITAPERUÇU","IVAÍ","LARANJEIRAS DO SUL","MALLET","LAPA","MANDIRITUBA",
+"MARQUINHO","MATO RICO","MORRETES","MATINHOS","NOVA LARANJEIRAS","NOVA TEBAS","ORTIGUEIRA",
+"PAULA FREITAS","PALMEIRA","PAULO FRONTIN","PIÊN","PINHAIS","PINHÃO","PIRAÍ DO SUL",
+"PITANGA","PARANAGUÁ","PONTA GROSSA","PORTO AMAZONAS","PORTO BARREIRO","PORTO VITÓRIA",
+"PRUDENTÓPOLIS","QUATRO BARRAS","QUEDAS DO IGUAÇU","QUITANDINHA","REBOUÇAS","RESERVA",
+"RESERVA DO IGUAÇU","RIO AZUL","RIO BONITO DO IGUAÇU","PIRAQUARA","PONTAL DO PARANÁ",
+"SANTA MARIA DO OESTE","RIO BRANCO DO SUL","RIO NEGRO","SÃO JOÃO DO TRIUNFO","SÃO JOSÉ DOS PINHAIS",
+"TEIXEIRA SOARES","TIBAGI","TIJUCAS DO SUL","SÃO MATEUS DO SUL","TUNAS DO PARANÁ",
+"UNIÃO DA VITÓRIA","VENTANIA","VIRMOND","CANTAGALO","TELÊMACO BORBA","LARANJAL",
+"PALMITAL","TURVO"];
+const ATIVIDADE_OPTIONS = ["AÇÃO DE QUALIDADE","ESTEIRA","MIGRACAO / DESLIGUE","REPARO"];
+const TECNOLOGIA_OPTIONS = ["ERB","GPON","SWT"];
+const EXECUTADOPOR_OPTIONS = ["CINTIA","MARIA CRISTINA","JONI WILSON","MARCOS NEVES","ANA VITORIA", "ISABELLA"];
 
 // Campos do formulário que são comboboxes com fallback (aceitam um valor
 // antigo fora da lista, sem perder o dado ao editar).
